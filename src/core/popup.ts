@@ -244,6 +244,19 @@ function setupStorageListeners() {
 
 function setupMessageListeners() {
 	browser.runtime.onMessage.addListener((request: any, sender: browser.Runtime.MessageSender, sendResponse: (response?: any) => void) => {
+		if (request.action === 'getCurrentTemplateFrontmatter') {
+			// Reader exports deliberately reuse the current panel state. This
+			// includes trigger selection, manual template changes, and user edits.
+			if (sender.tab?.id !== currentTabId) return;
+			generateFrontmatter(getPropertiesFromDOM())
+				.then(frontmatter => sendResponse({ frontmatter }))
+				.catch(error => sendResponse({
+					frontmatter: '',
+					error: error instanceof Error ? error.message : String(error),
+				}));
+			return true;
+		}
+
 		if (request.action === "triggerQuickClip") {
 			handleClipObsidian().then(() => {
 				sendResponse({success: true});

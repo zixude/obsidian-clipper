@@ -12,6 +12,7 @@ import { saveFile } from './utils/file-utils';
 import { debugLog } from './utils/debug';
 import { updateSidebarWidth, addResizeHandle, cleanupResizeHandlers } from './utils/iframe-resize';
 import { parseForClip } from './utils/clip-utils';
+import { applyCurrentClipperFrontmatter } from './utils/reader-export';
 
 declare global {
 	interface Window {
@@ -151,16 +152,18 @@ declare global {
 		}
 
 		if (request.action === "copyMarkdownToClipboard") {
-			flattenShadowDom(document).then(() => {
+			flattenShadowDom(document).then(async () => {
 				try {
 					const defuddled = parseForClip(document);
 
-					// Convert HTML content to markdown
+					// Convert the current Reader content to markdown exactly as before,
+					// then prefix the active Clipper panel's frontmatter.
 					const markdown = createMarkdownContent(defuddled.content, document.URL);
+					const fileContent = await applyCurrentClipperFrontmatter(markdown);
 
 					// Copy to clipboard
 					const textArea = document.createElement("textarea");
-					textArea.value = markdown;
+					textArea.value = fileContent;
 					document.body.appendChild(textArea);
 					textArea.select();
 					document.execCommand('copy');
@@ -180,10 +183,11 @@ declare global {
 				try {
 					const defuddled = parseForClip(document);
 					const markdown = createMarkdownContent(defuddled.content, document.URL);
+					const fileContent = await applyCurrentClipperFrontmatter(markdown);
 					const title = defuddled.title || document.title || 'Untitled';
 					const fileName = title.replace(/[/\\?%*:|"<>]/g, '-');
 					await saveFile({
-						content: markdown,
+						content: fileContent,
 						fileName,
 						mimeType: 'text/markdown',
 					});

@@ -30,6 +30,7 @@ import { getFontCss, isFontAvailable } from './font-utils';
 import { createMarkdownContent } from 'defuddle/full';
 import { saveFile } from './file-utils';
 import { parseForClip } from './clip-utils';
+import { applyCurrentClipperFrontmatter } from './reader-export';
 import { updateSidebarWidth, addResizeHandle, cleanupResizeHandlers } from './iframe-resize';
 import { setElementHTML, setSVGChildren, serializeChildren } from './dom-utils';
 
@@ -281,7 +282,7 @@ export class Reader {
 				if (action === 'copyToClipboard') {
 					const originalText = itemLabel.textContent;
 					if (Reader.isReaderPage) {
-						Reader.copyMarkdownOnReaderPage(doc);
+						await Reader.copyMarkdownOnReaderPage(doc);
 					} else {
 						browser.runtime.sendMessage({ action: 'copyMarkdownToClipboard' });
 					}
@@ -2777,13 +2778,14 @@ export class Reader {
 		container.addEventListener('animationend', () => hl().repositionHighlights(), { once: true });
 	}
 
-	static copyMarkdownOnReaderPage(doc: Document): void {
+	static async copyMarkdownOnReaderPage(doc: Document): Promise<void> {
 		try {
 			const defuddled = parseForClip(doc);
 			const markdown = createMarkdownContent(defuddled.content, doc.URL);
-			navigator.clipboard.writeText(markdown).catch(() => {
+			const fileContent = await applyCurrentClipperFrontmatter(markdown);
+			navigator.clipboard.writeText(fileContent).catch(() => {
 				const textArea = doc.createElement('textarea');
-				textArea.value = markdown;
+				textArea.value = fileContent;
 				doc.body.appendChild(textArea);
 				textArea.select();
 				doc.execCommand('copy');
@@ -2798,9 +2800,10 @@ export class Reader {
 		try {
 			const defuddled = parseForClip(doc);
 			const markdown = createMarkdownContent(defuddled.content, doc.URL);
+			const fileContent = await applyCurrentClipperFrontmatter(markdown);
 			const title = defuddled.title || doc.title || 'Untitled';
 			const fileName = title.replace(/[/\\?%*:|"<>]/g, '-');
-			await saveFile({ content: markdown, fileName, mimeType: 'text/markdown' });
+			await saveFile({ content: fileContent, fileName, mimeType: 'text/markdown' });
 		} catch (err) {
 			console.error('Failed to save markdown:', err);
 		}
